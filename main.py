@@ -1,5 +1,7 @@
 import tkinter as tk
 import re
+from tkinter import filedialog
+
 
 
 
@@ -28,6 +30,8 @@ class SyntaxHighlighter:
         # Top Menu
         self.menu_bar = tk.Menu(self.window)
         
+        self.open_file = None
+        
         # File part
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Open", command=lambda     : self.file_menu_selected(event=("Open",    "File")))
@@ -55,10 +59,8 @@ class SyntaxHighlighter:
         self.menu_bar.add_cascade(label="AutoComplete", menu=self.autocomplete_menu)
         
         self.window.config(menu=self.menu_bar)
-        
-        
-        
-        # Text Widget that holds all the text on the editor
+
+
         self.text = tk.Text(
             self.window,
             background="black",
@@ -68,9 +70,8 @@ class SyntaxHighlighter:
         self.text.pack(fill="both", expand=True)
 
         self.autocomplete_popup = None
-        self.autocomplete_listbox = None 
+        self.autocomplete_listbox = None
 
-        # tag configurations for the rules to be given
         self.text.tag_config("keyword", foreground="magenta")
         self.text.tag_config("constants", foreground="#66B2FF")
         self.text.tag_config("comment", foreground="green")
@@ -83,8 +84,6 @@ class SyntaxHighlighter:
         self.text.bind("<KeyRelease>", self.on_text_change)
         self.text.bind("<Motion>", self.on_mouse_motion)
 
-
-        # Rules for coloring the text
         self.syntax_rules = [
             (r'\b(addr|and|as|asm|atomic|bind|block|break|case|cast|concept|const|continue|converter|'
              r'defer|in|discard|distinct|div|do|elif|else|end|enum|except|export|finally|for|from|func|'
@@ -100,51 +99,55 @@ class SyntaxHighlighter:
             (r'[(){}\[\]]', "braces"),
             (r'#.*$', 'comment'),
         ]
-        
-        # Needed for calculating syntax matches
-        self.matches = []
-
-        # **** IMPORTANT ****
-        # looks for these options for autocompletion, notice that it is empty
-        self.autocomplete_keywords = []
 
         self.highlight_syntax()
 
         self.window.mainloop()
 
-    def add_autocomplete_match(self, match: str):
-        self.autocomplete_keywords.append(match)
-        self.autocomplete_keywords = list(set(self.autocomplete_keywords))
 
-    def show_popup(self):
-        popup = tk.Toplevel(self)
-        popup.title("Entry Popup")
-
-        entry = tk.Entry(popup)
-        entry.pack()
-
-        def get_entry_value():
-            value = entry.get()
-            print("Entry value:", value)
-            popup.destroy()
-
-        button = tk.Button(popup, text="OK", command=get_entry_value)
-        button.pack()
-        
-
-    def autocomplete_menu_selected(self, event, *args):
-        option, menu = event[0], event[1]
-        if option == "New Match":
-            self.show_popup()
-
-    def edit_menu_selected(self, event, *args):
-        print(event)
+    def file_menu_selected(self, *args, **kwargs):
+        if kwargs['event'] == ("Open", "File"):
+            self.open_file = filedialog.askopenfilename()
+            if self.open_file is not None:
+                with open(self.open_file, "r") as rfile:
+                    data = rfile.read()
+                self.text.delete("0.0", "end")
+                self.text.insert("0.0", data)
+                self.highlight_syntax()
+                    
+        elif kwargs['event'] == ("New File", "File"):
+            pass
+        elif kwargs['event'] == ("Save", "File"):
+            pass
+        elif kwargs['event'] == ("Save As", "File"):
+            pass 
     
-    def file_menu_selected(self, event, *args):
-        print(event)
-        
+    def edit_menu_selected(self, *args, **kwargs):
+        if kwargs['event'] == ("Cut", "Edit"):
+            print("CUT")
+        elif kwargs['event'] == ("Copy", "Edit"):
+            pass
+        elif kwargs['event'] == ("Paste", "Edit"):
+            pass
+        elif kwargs['event'] == ("Edit", "Edit"):
+            pass 
+    
+
+    def autocomplete_menu_selected(self, *args, **kwargs):
+        if kwargs['event'] == ("New Match", "AutoComplete"):
+            print("New Match")
+            
+        elif kwargs['event'] == ("Remove Match", "AutoComplete"):
+            pass
+        elif kwargs['event'] == ("Settings", "AutoComplete"):
+            pass
+        elif kwargs['event'] == ("Turn Off", "AutoComplete"):
+            pass 
+    
 
     def highlight_syntax(self, event=None):
+        print("<METHOD> highlight_syntax")
+
         self.text.tag_remove("keyword", "1.0", "end")
         self.text.tag_remove("constants", "1.0", "end")
         self.text.tag_remove("comment", "1.0", "end")
@@ -153,36 +156,30 @@ class SyntaxHighlighter:
         self.text.tag_remove("typing", "1.0", "end")
         self.text.tag_remove("braces", "1.0", "end")
 
-        # loop through the syntax rules
         for pattern, tag_name in self.syntax_rules:
-            
-            self.matches = re.finditer(pattern, self.text.get("1.0", "end"))
-            
-            if self.matches is None:
+            matches = re.finditer(pattern, self.text.get("1.0", "end"))
+            if matches is None:
                 continue
-            
-            for match in self.matches:
-                
+            for match in matches:
                 start = "1.0 + {}c".format(match.start())
                 end = "1.0 + {}c".format(match.end())
-                
                 self.text.tag_add(tag_name, start, end)
 
     def on_text_change(self, event=None):
-        """ Called when the text changes at all
+        print("<METHOD> on_text_change")
 
-        Args:
-            event (tkinter event): event related to text change. Defaults to None.
-        """
         self.highlight_syntax()
-        self.autocomplete()
+        self.autocomplete(event=event)
 
     def on_mouse_motion(self, event=None):
+
         cursor_index = self.text.index(tk.CURRENT)
         self.text.tag_remove("cursor", "1.0", "end")
         self.text.tag_add("cursor", cursor_index)
 
-    def autocomplete(self, *args):
+    def autocomplete(self, event, *args, **kwargs):
+        print("args: ", args, " kwargs: ", kwargs)
+        print("<METHOD> autocomplete")
         current_line, current_col = map(int, self.text.index(tk.INSERT).split("."))
         current_line_text = self.text.get(f"{current_line}.0", f"{current_line}.end")
         current_word = re.search(r"\w+$", current_line_text[:current_col])
@@ -196,85 +193,69 @@ class SyntaxHighlighter:
 
     def get_autocomplete_options(self, word, *args):
         # Replace this with your own logic to generate autocomplete options
-        return [keyword for keyword in self.autocomplete_keywords if keyword.startswith(word)]
+        print("args: ", args)
+        keywords = ["if", "else", "while", "for", "def", "class"]
+        return [keyword for keyword in keywords if keyword.startswith(word)]
 
-    def show_autocomplete_popup(self, options, col):
-        # init the top level
+    def show_autocomplete_popup(self, options, col, *args, **kwargs):
+        print("args: ", args, " kwargs: ", kwargs)
         self.autocomplete_popup = tk.Toplevel(self.window)
-        
         self.autocomplete_popup.wm_overrideredirect(True)
-        # create dimensions
-        self.autocomplete_popup.wm_geometry(f"+{self.window.winfo_rootx() + self.text.winfo_x() + col * 8}+{self.window.winfo_rooty() + self.text.winfo_y() + 24}")
-        # bind the focus out to self destruction
-        self.autocomplete_popup.bind("<FocusOut>", lambda event: self.autocomplete_popup.destroy())
+        self.autocomplete_popup.wm_geometry(
+            f"+{self.window.winfo_rootx() + self.text.winfo_x() + col * 8}+{self.window.winfo_rooty() + self.text.winfo_y() + 24}")
+        self.autocomplete_popup.bind("<FocusOut>", lambda : self.autocomplete_popup.destroy())
 
-
-        # create the listbox for selecting
-        self.autocomplete_listbox = tk.Listbox(self.autocomplete_popup, background="white", selectbackground="lightblue")
+        self.autocomplete_listbox = tk.Listbox(self.autocomplete_popup, background="white",
+                                               selectbackground="lightblue")
         for option in options:
             self.autocomplete_listbox.insert(tk.END, option)
 
-        # show the box 
         self.autocomplete_listbox.pack()
 
-        # Bind the keys to the box not the editor here
-        
         # Bind Up and Down arrow keys for keyboard navigation
-        self.text.bind("<Up>", lambda event: self.move_up(event))
-        self.text.bind("<Down>", lambda event: self.move_down(event))
-        self.text.bind("<Tab>", lambda event: self.autocomplete(event))
+        self.text.bind("<KeyPress-Up>", lambda : self.move_up(event=("Key.Up", )))
+        self.text.bind("<KeyPress-Down>", lambda : self.move_down(event=("Key.Down", )))
+        self.text.bind("<KeyPress-Tab>", lambda : self.autocomplete(event=("Key.Tab", )))
 
-        self.autocomplete_listbox.bind("<Button-1>", lambda event: self.text.focus_set())  # Set focus back to text widget on listbox click
+        self.autocomplete_listbox.bind("<Button-1>", lambda : self.text.focus_set())  # Set focus back to text widget on listbox click
 
         self.text.focus_set()
 
-
-    def clear_autocomplete_popup(self, *args):
+    def clear_autocomplete_popup(self, *args, **kwargs):
         """Clear the autocomplete popup."""
+        print("args: ", args, " kwargs: ", kwargs)
+        print("<METHOD> clear_autocomplete_popup")
         if self.autocomplete_popup:
             self.autocomplete_popup.destroy()
             self.autocomplete_popup = None
-            
-    def move_up(self, *args):
-        """ Move the selection in the autocomplete listbox up a selection
-        """
-        if self.autocomplete_popup:
-            self.autocomplete_listbox = self.autocomplete_popup.children["!listbox"]
-            index = self.autocomplete_listbox.index(tk.ACTIVE)
-            if index > 0:
-                self.autocomplete_listbox.selection_clear(index)
-                self.autocomplete_listbox.selection_own(index - 1)
-                self.autocomplete_listbox.selection_handle(index - 1)
-                self.autocomplete_listbox.yview_scroll(-1, "units")
+            self.autocomplete_listbox = None
 
-    def move_down(self, *args):
-        """ Move the selector down a selection 
-        """
-        if self.autocomplete_popup:
-            self.autocomplete_listbox = self.autocomplete_popup.children["!listbox"]
-            index = self.autocomplete_listbox.index(tk.ACTIVE)
-            if index < self.autocomplete_listbox.size() - 1:
-                self.autocomplete_listbox.selection_clear(index)
-                self.autocomplete_listbox.selection_set(index + 1)
-                self.autocomplete_listbox.activate(index + 1)
-                self.autocomplete_listbox.yview_scroll(1, "units")
+    def move_up(self, *args, **kwargs):
+        """Move the selection in autocomplete popup up."""
+        print("args: ", args, " kwargs: ", kwargs)
+        if self.autocomplete_listbox:
+            current_index = self.autocomplete_listbox.curselection()
+            if current_index:
+                new_index = current_index[0] - 1
+                if new_index >= 0:
+                    self.autocomplete_listbox.selection_clear(current_index)
+                    self.autocomplete_listbox.selection_set(new_index)
+                    self.autocomplete_listbox.activate(new_index)
 
-    def select_autocomplete(self, *args):
-        """ called when tab is pressed when the autocomplete box is present
-        """
-        if self.autocomplete_popup:
-            self.autocomplete_listbox = self.autocomplete_popup.children["!listbox"]
-            selected_index = self.autocomplete_listbox.curselection()
-            if selected_index:
-                selected_option = self.autocomplete_listbox.get(selected_index)
-                self.insert_autocomplete(selected_option)
+    def move_down(self, *args, **kwargs):
+        """Move the selection in autocomplete popup down."""
+        print("args: ", args, " kwargs: ", kwargs)
+        if self.autocomplete_listbox:
+            current_index = self.autocomplete_listbox.curselection()
+            if current_index:
+                new_index = current_index[0] + 1
+                if new_index < self.autocomplete_listbox.size():
+                    self.autocomplete_listbox.selection_clear(current_index)
+                    self.autocomplete_listbox.selection_set(new_index)
+                    self.autocomplete_listbox.activate(new_index)
 
-    def insert_autocomplete(self, option, *args):
-        """ called when there needs to be a word inserted from the autocomplete
-
-        Args:
-            option (the option chosen)
-        """
+    def insert_autocomplete(self, option, *args, **kwargs):
+        print("args: ", args, " kwargs: ", kwargs)
         current_line, current_col = map(int, self.text.index(tk.INSERT).split("."))
         current_line_text = self.text.get(f"{current_line}.0", f"{current_line}.end")
         current_word = re.search(r"\w+$", current_line_text[:current_col])
@@ -282,10 +263,7 @@ class SyntaxHighlighter:
             word_start = current_col - current_word.start()
             self.text.delete(f"{current_line}.{word_start}", f"{current_line}.{current_col}")
         self.text.insert(tk.INSERT, option)
-        self.clear_autocomplete_popup()
-        self.text.focus_set()
-
 
 
 if __name__ == "__main__":
-    app = SyntaxHighlighter()
+    editor = SyntaxHighlighter()
